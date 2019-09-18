@@ -1,32 +1,27 @@
 # malariacnn
 
-FIXME: description
+Convolutional neural network for malaria detection based od blood cell image in Clojure
 
 ## Installation
 
-Download from http://example.com/FIXME.
+Download dataset from https://www.kaggle.com/iarunava/cell-images-for-detecting-malaria.
 
 ## Usage
 
-FIXME: explanation
+DATA
+
+Download dataset. Rename images to class_name.image_number (for example parazitised.100.png or uninfected.55.png).
+Add folder original to resources. Put all images (from both classes) directly into this folder.
+Run dataprep.clj
+
+TRAINING
+Run training.clj
+
+TEST
+Run example.clj to test network performance with new image
 
     $ java -jar malariacnn-0.1.0-standalone.jar [args]
 
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
 
 ## License
 
