@@ -1,0 +1,435 @@
+;; Connected to nREPL server - nrepl://localhost:53903
+;; CIDER 0.22.0snapshot (package: 20190321.2129), nREPL 0.6.0
+;; Clojure 1.8.0, Java 1.8.0_77
+;;     Docs: (doc function-name)
+;;           (find-doc part-of-name)
+;;   Source: (source function-name)
+;;  Javadoc: (javadoc java-object-or-class)
+;;     Exit: <C-c C-q>
+;;  Results: Stored in vars *1, *2, *3, an exception in *e;
+;; ======================================================================
+;; If you¡¯re new to CIDER it is highly recommended to go through its
+;; manual first. Type <M-x cider-view-manual> to view it.
+;; In case you¡¯re seeing any warnings you should consult the manual¡¯s
+;; "Troubleshooting" section.
+;;
+;; Here are few tips to get you started:
+;;
+;; * Press <C-h m> to see a list of the keybindings available (this
+;;   will work in every Emacs buffer)
+;; * Press <,> to quickly invoke some REPL command
+;; * Press <C-c C-z> to switch between the REPL and a Clojure file
+;; * Press <M-.> to jump to the source of something (e.g. a var, a
+;;   Java method)
+;; * Press <C-c C-d C-d> to view the documentation for something (e.g.
+;;   a var, a Java method)
+;; * Enable ¡®eldoc-mode¡¯ to display function & method signatures in the minibuffer.
+;; * Print CIDER¡¯s refcard and keep it close to your keyboard.
+;;
+;; CIDER is super customizable - try <M-x customize-group cider> to
+;; get a feel for this. If you¡¯re thirsty for knowledge you should try
+;; <M-x cider-drink-a-sip>.
+;;
+;; If you think you¡¯ve encountered a bug (or have some suggestions for
+;; improvements) use <M-x cider-report-bug> to report it.
+;;
+;; Above all else - don¡¯t panic! In case of an emergency - procure
+;; some (hard) cider and enjoy it responsibly!
+;;
+;; You can remove this message with the <M-x cider-repl-clear-help-banner> command.
+;; You can disable it from appearing on start by setting
+;; ¡®cider-repl-display-help-banner¡¯ to nil.
+;; ======================================================================
+malariacnn.core> (ns malariacnn.training
+  (:require [clojure.java.io :as io]))
+
+;;;
+; SETUP: PARAMETERS
+;;;
+(def dataset-folder "resources/")
+(def training-folder (str dataset-folder "training"))
+(def test-folder (str dataset-folder "testing"))
+(def categories 
+  (into [] (map #(.getName %) (.listFiles (io/file training-folder)))))
+; ["parasitized" "uninfected"]
+(def num-classes 
+  (count categories))
+; 2
+(def class-mapping
+  {:class-name->index (zipmap categories (range))
+   :index->class-name (zipmap (range) categories)})
+;zipmap keys vals
+;Returns a map with the keys mapped to the corresponding vals.
+   
+   
+; guessing width size from the first training picture
+(require '[mikera.image.core :as imagez])
+(def first-test-pic 
+  (first (filter #(.isFile %) (file-seq (io/file training-folder)))))
+(imagez/load-image first-test-pic)
+(def image-size 
+  (.getWidth (imagez/load-image first-test-pic)))
+
+;;;
+; SETUP: DATA SOURCES
+;;;
+
+(require '[cortex.experiment.util :as experiment-util])
+(def train-ds
+ (-> training-folder
+   (experiment-util/create-dataset-from-folder
+     class-mapping :image-aug-fn (:image-aug-fn {}))
+   (experiment-util/infinite-class-balanced-dataset)))
+
+(def test-ds
+ (-> test-folder
+     (experiment-util/create-dataset-from-folder class-mapping)))
+
+
+;;;
+; SETUP: NETWORK DESCRIPTION
+;;;
+(require '[cortex.nn.layers :as layers])
+
+(defn initial-description
+ [input-w input-h num-classes]
+ [(layers/input input-w input-h 1 :id :data)
+  (layers/convolutional 5 0 1 20)
+  (layers/max-pooling 2 0 2)
+  (layers/dropout 0.9)
+  (layers/relu)
+  (layers/convolutional 5 0 1 50)
+  (layers/max-pooling 2 0 2)
+  (layers/batch-normalization)
+  (layers/linear 1000)
+  (layers/relu :center-loss {:label-indexes {:stream :labels}
+                             :label-inverse-counts {:stream :labels}
+                             :labels {:stream :labels}
+                             :alpha 0.9
+                             :lambda 1e-4})
+  (layers/dropout 0.5)
+  (layers/linear num-classes)
+  (layers/softmax :id :labels)])
+
+;;;
+; UTIL FUNCTION
+;;;
+(require
+     '[think.image.patch :as patch])
+(defn- observation->image
+   "Creates a BufferedImage suitable for web display from the raw data
+   that the net expects."
+   [observation]
+   (patch/patch->image observation image-size))
+nil#'malariacnn.training/dataset-folder#'malariacnn.training/training-folder#'malariacnn.training/test-folder#'malariacnn.training/categories#'malariacnn.training/num-classes#'malariacnn.training/class-mappingnil#'malariacnn.training/first-test-pic#object[java.awt.image.BufferedImage 0x580c69b6 "BufferedImage@580c69b6: type = 2 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 52 height = 52 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0"]
+ #'malariacnn.training/image-sizenilBuilding dataset from folder: resources/training
+#'malariacnn.training/train-dsBuilding dataset from folder: resources/testing
+#'malariacnn.training/test-dsnil#'malariacnn.training/initial-descriptionnil#'malariacnn.training/observation->image
+malariacnn.training> (defn initial-description
+ [input-w input-h num-classes]
+ [(layers/input input-w input-h 1 :id :data)
+  (layers/convolutional 5 0 1 20)
+  (layers/max-pooling 2 0 2)
+  (layers/dropout 0.8)
+  (layers/relu)
+  (layers/convolutional 5 0 1 50)
+  (layers/max-pooling 2 0 2)
+  (layers/batch-normalization)
+  (layers/linear 1000)
+  (layers/relu :center-loss {:label-indexes {:stream :labels}
+                             :label-inverse-counts {:stream :labels}
+                             :labels {:stream :labels}
+                             :alpha 0.9
+                             :lambda 1e-4})
+  (layers/dropout 0.5)
+  (layers/linear num-classes)
+  (layers/softmax :id :labels)])
+#'malariacnn.training/initial-description
+malariacnn.training> (require '[cortex.experiment.classification :as classification])
+Reflection warning, cognitect/transit.clj:142:19 - call to static method writer on com.cognitect.transit.TransitFactory can't be resolved (argument types: unknown, java.io.OutputStream, unknown).
+Sep 14, 2019 7:10:42 PM com.github.fommil.netlib.BLAS <clinit>
+WARNING: Failed to load implementation from: com.github.fommil.netlib.NativeSystemBLAS
+Sep 14, 2019 7:10:43 PM com.github.fommil.jni.JniLoader liberalLoad
+INFO: successfully loaded C:\Users\Kaca\AppData\Local\Temp\jniloader3801799560378083054netlib-native_ref-win-x86_64.dll
+nil
+malariacnn.training> (let [listener (classification/create-listener observation->image
+                                                 class-mapping
+                                                 {})]
+    (classification/perform-experiment
+     (initial-description image-size image-size num-classes)
+     train-ds
+     test-ds
+     listener))
+Gate opened on http://localhost:8091linear
+CUDA backend creation failed, reverting to CPU
+Training network:
+
+|                 type |            input |           output |  :bias | :centers | :means | :scale | :variances |    :weights |
+|----------------------+------------------+------------------+--------+----------+--------+--------+------------+-------------|
+|       :convolutional |   1x52x52 - 2704 | 20x48x48 - 46080 |   [20] |          |        |        |            |     [20 25] |
+|         :max-pooling | 20x48x48 - 46080 | 20x24x24 - 11520 |        |          |        |        |            |             |
+|             :dropout | 20x24x24 - 11520 | 20x24x24 - 11520 |        |          |        |        |            |             |
+|                :relu | 20x24x24 - 11520 | 20x24x24 - 11520 |        |          |        |        |            |             |
+|       :convolutional | 20x24x24 - 11520 | 50x20x20 - 20000 |   [50] |          |        |        |            |    [50 500] |
+|         :max-pooling | 50x20x20 - 20000 |  50x10x10 - 5000 |        |          |        |        |            |             |
+| :batch-normalization |  50x10x10 - 5000 |  50x10x10 - 5000 | [5000] |          | [5000] | [5000] |     [5000] |             |
+|              :linear |  50x10x10 - 5000 |  1x1x1000 - 1000 | [1000] |          |        |        |            | [1000 5000] |
+|                :relu |  1x1x1000 - 1000 |  1x1x1000 - 1000 |        |          |        |        |            |             |
+|             :dropout |  1x1x1000 - 1000 |  1x1x1000 - 1000 |        |          |        |        |            |             |
+|              :linear |  1x1x1000 - 1000 |        1x1x2 - 2 |    [2] |          |        |        |            |    [2 1000] |
+|             :softmax |        1x1x2 - 2 |        1x1x2 - 2 |        |          |        |        |            |             |
+Parameter count: 5050572
+Saving network to trained-network.nippy
+Classification accuracy: 0.631758473038682
+Saving network to trained-network.nippy
+Classification accuracy: 0.6080267073082227
+Classification accuracy: 0.612018288700196
+Classification accuracy: 0.6202917483126497
+Classification accuracy: 0.6260976848827927
+Classification accuracy: 0.6244284781188766
+Classification accuracy: 0.6187676899629873
+Classification accuracy: 0.6066477973728137
+Classification accuracy: 0.5914797880833152
+malariacnn.training> (defn initial-description
+ [input-w input-h num-classes]
+ [(layers/input input-w input-h 1 :id :data)
+  (layers/convolutional 5 0 1 30)
+  (layers/max-pooling 2 0 2)
+  (layers/relu)
+  (layers/convolutional 5 0 1 50)
+  (layers/max-pooling 2 0 2)
+  (layers/batch-normalization)
+  (layers/linear 1000)
+  (layers/relu :center-loss {:label-indexes {:stream :labels}
+                             :label-inverse-counts {:stream :labels}
+                             :labels {:stream :labels}
+                             :alpha 0.9
+                             :lambda 1e-4})
+  (layers/linear num-classes)
+  (layers/softmax :id :labels)])
+#'malariacnn.training/initial-description
+malariacnn.training> (let [listener (classification/create-listener observation->image
+                                                 class-mapping
+                                                 {})]
+    (classification/perform-experiment
+     (initial-description image-size image-size num-classes)
+     train-ds
+     test-ds
+     listener))
+Gate opened on http://localhost:8091
+CUDA backend creation failed, reverting to CPU
+Training network:
+
+|                 type |            input |           output |  :bias | :centers | :means | :scale | :variances |    :weights |
+|----------------------+------------------+------------------+--------+----------+--------+--------+------------+-------------|
+|       :convolutional |   1x52x52 - 2704 | 30x48x48 - 69120 |   [30] |          |        |        |            |     [30 25] |
+|         :max-pooling | 30x48x48 - 69120 | 30x24x24 - 17280 |        |          |        |        |            |             |
+|                :relu | 30x24x24 - 17280 | 30x24x24 - 17280 |        |          |        |        |            |             |
+|       :convolutional | 30x24x24 - 17280 | 50x20x20 - 20000 |   [50] |          |        |        |            |    [50 750] |
+|         :max-pooling | 50x20x20 - 20000 |  50x10x10 - 5000 |        |          |        |        |            |             |
+| :batch-normalization |  50x10x10 - 5000 |  50x10x10 - 5000 | [5000] |          | [5000] | [5000] |     [5000] |             |
+|              :linear |  50x10x10 - 5000 |  1x1x1000 - 1000 | [1000] |          |        |        |            | [1000 5000] |
+|                :relu |  1x1x1000 - 1000 |  1x1x1000 - 1000 |        |          |        |        |            |             |
+|              :linear |  1x1x1000 - 1000 |        1x1x2 - 2 |    [2] |          |        |        |            |    [2 1000] |
+|             :softmax |        1x1x2 - 2 |        1x1x2 - 2 |        |          |        |        |            |             |
+Parameter count: 5063332
+Saving network to trained-network.nippy
+Classification accuracy: 0.6486682632992234
+Saving network to trained-network.nippy
+Saving network to trained-network.nippy
+Classification accuracy: 0.692140213368169
+Saving network to trained-network.nippy
+Classification accuracy: 0.663110530517454
+Classification accuracy: 0.6461281660497858
+Classification accuracy: 0.5068582625734814
+Classification accuracy: 0.4974236156469991
+Classification accuracy: 0.50801944988751
+Classification accuracy: 0.6342985702881196
+malariacnn.training> (defn initial-description
+ [input-w input-h num-classes]
+ [(layers/input input-w input-h 1 :id :data)
+  (layers/convolutional 5 0 1 30)
+  (layers/max-pooling 2 0 1)
+  (layers/relu)
+  (layers/convolutional 5 0 1 50)
+  (layers/max-pooling 2 0 1)
+  (layers/batch-normalization)
+  (layers/linear 1000)
+  (layers/relu :center-loss {:label-indexes {:stream :labels}
+                             :label-inverse-counts {:stream :labels}
+                             :labels {:stream :labels}
+                             :alpha 0.9
+                             :lambda 1e-4})
+  (layers/linear num-classes)
+  (layers/softmax :id :labels)])
+#'malariacnn.training/initial-description
+malariacnn.training> (let [listener (classification/create-listener observation->image
+                                                 class-mapping
+                                                 {})]
+    (classification/perform-experiment
+     (initial-description image-size image-size num-classes)
+     train-ds
+     test-ds
+     listener))
+Gate opened on http://localhost:8091
+CUDA backend creation failed, reverting to CPU
+Training network:
+
+|                 type |            input |           output |   :bias | :centers |  :means |  :scale | :variances |     :weights |
+|----------------------+------------------+------------------+---------+----------+---------+---------+------------+--------------|
+|       :convolutional |   1x52x52 - 2704 | 30x48x48 - 69120 |    [30] |          |         |         |            |      [30 25] |
+|         :max-pooling | 30x48x48 - 69120 | 30x47x47 - 66270 |         |          |         |         |            |              |
+|                :relu | 30x47x47 - 66270 | 30x47x47 - 66270 |         |          |         |         |            |              |
+|       :convolutional | 30x47x47 - 66270 | 50x43x43 - 92450 |    [50] |          |         |         |            |     [50 750] |
+|         :max-pooling | 50x43x43 - 92450 | 50x42x42 - 88200 |         |          |         |         |            |              |
+| :batch-normalization | 50x42x42 - 88200 | 50x42x42 - 88200 | [88200] |          | [88200] | [88200] |    [88200] |              |
+|              :linear | 50x42x42 - 88200 |  1x1x1000 - 1000 |  [1000] |          |         |         |            | [1000 88200] |
+|                :relu |  1x1x1000 - 1000 |  1x1x1000 - 1000 |         |          |         |         |            |              |
+|              :linear |  1x1x1000 - 1000 |        1x1x2 - 2 |     [2] |          |         |         |            |     [2 1000] |
+|             :softmax |        1x1x2 - 2 |        1x1x2 - 2 |         |          |         |         |            |              |
+Parameter count: 88596132
+IllegalArgumentException No implementation of method: :->view-impl of protocol: #'think.datatype.base/PView found for class: clojure.lang.ExceptionInfo  clojure.core/-cache-protocol-fn (core_deftype.clj:568)
+malariacnn.training> (defn initial-description
+ [input-w input-h num-classes]
+ [(layers/input input-w input-h 1 :id :data)
+  (layers/convolutional 5 0 1 30)
+  (layers/max-pooling 2 1 2)
+  (layers/relu)
+  (layers/convolutional 5 0 1 50)
+  (layers/max-pooling 2 1 2)
+  (layers/batch-normalization)
+  (layers/linear 1000)
+  (layers/relu :center-loss {:label-indexes {:stream :labels}
+                             :label-inverse-counts {:stream :labels}
+                             :labels {:stream :labels}
+                             :alpha 0.9
+                             :lambda 1e-4})
+  (layers/linear num-classes)
+  (layers/softmax :id :labels)])
+#'malariacnn.training/initial-description
+malariacnn.training> (let [listener (classification/create-listener observation->image
+                                                 class-mapping
+                                                 {})]
+    (classification/perform-experiment
+     (initial-description image-size image-size num-classes)
+     train-ds
+     test-ds
+     listener))
+Gate opened on http://localhost:8091
+CUDA backend creation failed, reverting to CPU
+Training network:
+
+|                 type |            input |           output |  :bias | :centers | :means | :scale | :variances |    :weights |
+|----------------------+------------------+------------------+--------+----------+--------+--------+------------+-------------|
+|       :convolutional |   1x52x52 - 2704 | 30x48x48 - 69120 |   [30] |          |        |        |            |     [30 25] |
+|         :max-pooling | 30x48x48 - 69120 | 30x25x25 - 18750 |        |          |        |        |            |             |
+|                :relu | 30x25x25 - 18750 | 30x25x25 - 18750 |        |          |        |        |            |             |
+|       :convolutional | 30x25x25 - 18750 | 50x21x21 - 22050 |   [50] |          |        |        |            |    [50 750] |
+|         :max-pooling | 50x21x21 - 22050 |  50x12x12 - 7200 |        |          |        |        |            |             |
+| :batch-normalization |  50x12x12 - 7200 |  50x12x12 - 7200 | [7200] |          | [7200] | [7200] |     [7200] |             |
+|              :linear |  50x12x12 - 7200 |  1x1x1000 - 1000 | [1000] |          |        |        |            | [1000 7200] |
+|                :relu |  1x1x1000 - 1000 |  1x1x1000 - 1000 |        |          |        |        |            |             |
+|              :linear |  1x1x1000 - 1000 |        1x1x2 - 2 |    [2] |          |        |        |            |    [2 1000] |
+|             :softmax |        1x1x2 - 2 |        1x1x2 - 2 |        |          |        |        |            |             |
+Parameter count: 7272132
+Saving network to trained-network.nippy
+Classification accuracy: 0.7101386167356122
+Saving network to trained-network.nippy
+Classification accuracy: 0.6753029973147543
+Saving network to trained-network.nippy
+Classification accuracy: 0.727919297481675
+Saving network to trained-network.nippy
+Classification accuracy: 0.7176137600696711
+Classification accuracy: 0.7033166412656942
+Saving network to trained-network.nippy
+Classification accuracy: 0.7613034327599971
+Saving network to trained-network.nippy
+Classification accuracy: 0.7549894767399666
+Classification accuracy: 0.7430873067711735
+Saving network to trained-network.nippy
+Classification accuracy: 0.7774149067421438
+Saving network to trained-network.nippy
+Saving network to trained-network.nippy
+Classification accuracy: 0.7861238115973583
+Saving network to trained-network.nippy
+Classification accuracy: 0.7819145075840046
+Classification accuracy: 0.7706655054793526
+Classification accuracy: 0.7813339139269903
+Saving network to trained-network.nippy
+Classification accuracy: 0.7978808331518978
+Saving network to trained-network.nippy
+Classification accuracy: 0.7749473836998331
+Classification accuracy: 0.7786486682632991
+Classification accuracy: 0.7893896509180637
+Classification accuracy: 0.764061252630815
+Classification accuracy: 0.7973002394948835
+Classification accuracy: 0.7823499528267654
+Classification accuracy: 0.78314826910516
+Classification accuracy: 0.7946149938311924
+Classification accuracy: 0.7905508382320923
+malariacnn.training> (defn initial-description
+ [input-w input-h num-classes]
+ [(layers/input input-w input-h 1 :id :data)
+  (layers/convolutional 5 0 1 20)
+  (layers/max-pooling 2 1 2)
+  (layers/dropout 0.9)
+  (layers/relu)
+  (layers/convolutional 5 0 1 50)
+  (layers/max-pooling 2 1 2)
+  (layers/batch-normalization)
+  (layers/linear 1000)
+  (layers/relu :center-loss {:label-indexes {:stream :labels}
+                             :label-inverse-counts {:stream :labels}
+                             :labels {:stream :labels}
+                             :alpha 0.9
+                             :lambda 1e-4})
+  (layers/dropout 0.5)
+  (layers/linear num-classes)
+  (layers/softmax :id :labels)])
+#'malariacnn.training/initial-description
+malariacnn.training> (let [listener (classification/create-listener observation->image
+                                                 class-mapping
+                                                 {})]
+    (classification/perform-experiment
+     (initial-description image-size image-size num-classes)
+     train-ds
+     test-ds
+     listener))
+Gate opened on http://localhost:8091
+CUDA backend creation failed, reverting to CPU
+Training network:
+
+|                 type |            input |           output |  :bias | :centers | :means | :scale | :variances |    :weights |
+|----------------------+------------------+------------------+--------+----------+--------+--------+------------+-------------|
+|       :convolutional |   1x52x52 - 2704 | 20x48x48 - 46080 |   [20] |          |        |        |            |     [20 25] |
+|         :max-pooling | 20x48x48 - 46080 | 20x25x25 - 12500 |        |          |        |        |            |             |
+|             :dropout | 20x25x25 - 12500 | 20x25x25 - 12500 |        |          |        |        |            |             |
+|                :relu | 20x25x25 - 12500 | 20x25x25 - 12500 |        |          |        |        |            |             |
+|       :convolutional | 20x25x25 - 12500 | 50x21x21 - 22050 |   [50] |          |        |        |            |    [50 500] |
+|         :max-pooling | 50x21x21 - 22050 |  50x12x12 - 7200 |        |          |        |        |            |             |
+| :batch-normalization |  50x12x12 - 7200 |  50x12x12 - 7200 | [7200] |          | [7200] | [7200] |     [7200] |             |
+|              :linear |  50x12x12 - 7200 |  1x1x1000 - 1000 | [1000] |          |        |        |            | [1000 7200] |
+|                :relu |  1x1x1000 - 1000 |  1x1x1000 - 1000 |        |          |        |        |            |             |
+|             :dropout |  1x1x1000 - 1000 |  1x1x1000 - 1000 |        |          |        |        |            |             |
+|              :linear |  1x1x1000 - 1000 |        1x1x2 - 2 |    [2] |          |        |        |            |    [2 1000] |
+|             :softmax |        1x1x2 - 2 |        1x1x2 - 2 |        |          |        |        |            |             |
+Parameter count: 7259372
+Saving network to trained-network.nippy
+Classification accuracy: 0.6707308222657667
+Saving network to trained-network.nippy
+Classification accuracy: 0.6443138108716162
+Saving network to trained-network.nippy
+Classification accuracy: 0.674069235793599
+Saving network to trained-network.nippy
+Classification accuracy: 0.6538210320052253
+Classification accuracy: 0.6610784527179041
+Classification accuracy: 0.6541113288337325
+Classification accuracy: 0.6572320197401843
+Classification accuracy: 0.6408302489295304
+Classification accuracy: 0.6163001669206764
+Classification accuracy: 0.6739966615864722
+Classification accuracy: 0.6692067639161042
+Classification accuracy: 0.6262428332970462
+Classification accuracy: 0.655272516147761
+Classification accuracy: 0.6718194353726686
+malariacnn.training> 
